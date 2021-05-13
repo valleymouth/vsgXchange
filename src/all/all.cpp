@@ -23,6 +23,9 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 using namespace vsgXchange;
 
+// Register the all::create() method with vsg::ObjectFactory::instance() so it can be used for creating objects during reading.
+vsg::RegisterWithObjectFactoryProxy<vsgXchange::all> s_Register_all;
+
 all::all()
 {
 #ifdef vsgXchange_CURL
@@ -53,4 +56,12 @@ all::all()
 #ifdef vsgXchange_OSG
     add(OSG::create());
 #endif
+}
+
+void all::read(vsg::Input& /*input*/)
+{
+}
+
+void all::write(vsg::Output& /*output*/) const
+{
 }

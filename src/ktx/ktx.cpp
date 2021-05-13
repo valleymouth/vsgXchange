@@ -24,6 +24,9 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #include <cstring>
 #include <iostream>
 
+// Register the ktx::create() method with vsg::ObjectFactory::instance() so it can be used for creating objects during reading.
+vsg::RegisterWithObjectFactoryProxy<vsgXchange::ktx> s_Register_ktx;
+
 namespace
 {
 

@@ -13,11 +13,15 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #include <vsgXchange/images.h>
 
 #include <vsgGIS/gdal_utils.h>
+#include <vsgGIS/TileDatabase.h>
 
 #include <cstring>
 #include <iostream>
 
 using namespace vsgXchange;
+
+// Register the GDAL::create() method with vsg::ObjectFactory::instance() so it can be used for creating objects during reading.
+vsg::RegisterWithObjectFactoryProxy<vsgXchange::GDAL> s_Register_GDAL;
 
 namespace vsgXchange
 {
@@ -41,6 +45,7 @@ namespace vsgXchange
 GDAL::GDAL() :
     _implementation(new GDAL::Implementation())
 {
+    vsgGIS::init();
 }
 
 vsg::ref_ptr<vsg::Object> GDAL::read(const vsg::Path& filename, vsg::ref_ptr<const vsg::Options> options) const

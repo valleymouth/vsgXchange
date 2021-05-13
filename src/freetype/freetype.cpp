@@ -26,6 +26,9 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #include <iostream>
 #include <set>
 
+// Register the freetype::create() method with vsg::ObjectFactory::instance() so it can be used for creating objects during reading.
+vsg::RegisterWithObjectFactoryProxy<vsgXchange::freetype> s_Register_freetype;
+
 namespace vsgXchange
 {
 

@@ -28,6 +28,9 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 
+// Register the assump::create() method with vsg::ObjectFactory::instance() so it can be used for creating objects during reading.
+vsg::RegisterWithObjectFactoryProxy<vsgXchange::assimp> s_Register_assimp;
+
 namespace
 {
 

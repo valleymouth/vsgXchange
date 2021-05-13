@@ -32,6 +32,9 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #    pragma GCC diagnostic pop
 #endif
 
+// Register the dds::create() method with vsg::ObjectFactory::instance() so it can be used for creating objects during reading.
+vsg::RegisterWithObjectFactoryProxy<vsgXchange::dds> s_Register_dds;
+
 namespace
 {
     const std::unordered_map<tinyddsloader::DDSFile::DXGIFormat, VkFormat> kFormatMap{

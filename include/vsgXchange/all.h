@@ -32,6 +32,9 @@ namespace vsgXchange
     {
     public:
         all();
+
+        void read(vsg::Input& input) override;
+        void write(vsg::Output& output) const override;
     };
 } // namespace vsgXchange
 
