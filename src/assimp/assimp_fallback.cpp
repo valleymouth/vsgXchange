@@ -18,10 +18,14 @@ using namespace vsgXchange;
 //
 // assimp ReaderWriter fallback
 //
-struct assimp::Implementation
+class assimp::Implementation
 {
 };
-assimp::assimp()
+assimp::assimp() :
+    _implementation(nullptr)
+{
+}
+assimp::~assimp()
 {
 }
 vsg::ref_ptr<vsg::Object> assimp::read(const vsg::Path&, vsg::ref_ptr<const vsg::Options>) const

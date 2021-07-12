@@ -21,9 +21,13 @@ using namespace vsgXchange;
 struct freetype::Implementation
 {
 };
-freetype::freetype()
+freetype::freetype() :
+    _implementation(nullptr)
 {
 }
+freetype::~freetype()
+{
+};
 vsg::ref_ptr<vsg::Object> freetype::read(const vsg::Path&, vsg::ref_ptr<const vsg::Options>) const
 {
     return {};
