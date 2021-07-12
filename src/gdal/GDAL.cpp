@@ -48,6 +48,11 @@ GDAL::GDAL() :
     vsgGIS::init();
 }
 
+GDAL::~GDAL()
+{
+    delete _implementation;
+}
+
 vsg::ref_ptr<vsg::Object> GDAL::read(const vsg::Path& filename, vsg::ref_ptr<const vsg::Options> options) const
 {
     return _implementation->read(filename, options);

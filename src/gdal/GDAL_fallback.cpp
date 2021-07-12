@@ -18,10 +18,13 @@ using namespace vsgXchange;
 //
 // GDAL ReaderWriter fallback
 //
-struct GDAL::Implementation
+class GDAL::Implementation
 {
 };
-GDAL::GDAL()
+GDAL::GDAL() : _implementation(nullptr)
+{
+}
+GDAL::~GDAL()
 {
 }
 vsg::ref_ptr<vsg::Object> GDAL::read(const vsg::Path&, vsg::ref_ptr<const vsg::Options>) const

@@ -76,10 +76,14 @@ namespace vsgXchange
 //
 // CURL ReaderWriter fascade
 //
-curl::curl()
+curl::curl() :
+    _implementation(nullptr)
 {
 }
-
+curl::~curl()
+{
+    delete _implementation;
+}
 vsg::ref_ptr<vsg::Object> curl::read(const vsg::Path& filename, vsg::ref_ptr<const vsg::Options> options) const
 {
     vsg::Path serverFilename = filename;
@@ -121,7 +125,7 @@ vsg::ref_ptr<vsg::Object> curl::read(const vsg::Path& filename, vsg::ref_ptr<con
     {
         {
             std::scoped_lock<std::mutex> lock(_mutex);
-            if (!_implementation) _implementation.reset(new curl::Implementation());
+            if (!_implementation) _implementation = new curl::Implementation();
         }
 
         return _implementation->read(serverFilename, options);
