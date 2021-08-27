@@ -458,11 +458,15 @@ assimp::Implementation::BindState assimp::Implementation::processMaterials(const
         const auto material = scene->mMaterials[i];
 
         bool hasPbrSpecularGlossiness{false};
+        // TODO: Fix build error : ‘AI_MATKEY_GLTF_PBRSPECULARGLOSSINESS’ was not declared
+        #define AI_MATKEY_GLTF_PBRSPECULARGLOSSINESS "$mat.gltf.pbrSpecularGlossiness", 0, 0
         material->Get(AI_MATKEY_GLTF_PBRSPECULARGLOSSINESS, hasPbrSpecularGlossiness);
 
         auto shaderHints = vsg::ShaderCompileSettings::create();
         std::vector<std::string>& defines = shaderHints->defines;
 
+        // TODO: Fix build error : ‘AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_BASE_COLOR_FACTOR’ was not declared
+        #define AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_BASE_COLOR_FACTOR "$mat.gltf.pbrMetallicRoughness.baseColorFactor", 0, 0
         if (vsg::PbrMaterial pbr; material->Get(AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_BASE_COLOR_FACTOR, pbr.baseColorFactor) == AI_SUCCESS || hasPbrSpecularGlossiness)
         {
             // PBR path
@@ -474,6 +478,8 @@ assimp::Implementation::BindState assimp::Implementation::processMaterials(const
                 material->Get(AI_MATKEY_COLOR_DIFFUSE, pbr.diffuseFactor);
                 material->Get(AI_MATKEY_COLOR_SPECULAR, pbr.specularFactor);
 
+                // TODO: Fix build error : ‘AI_MATKEY_GLTF_PBRSPECULARGLOSSINESS_GLOSSINESS_FACTOR’ was not declared
+                #define AI_MATKEY_GLTF_PBRSPECULARGLOSSINESS_GLOSSINESS_FACTOR "$mat.gltf.pbrMetallicRoughness.glossinessFactor", 0, 0
                 if (material->Get(AI_MATKEY_GLTF_PBRSPECULARGLOSSINESS_GLOSSINESS_FACTOR, pbr.specularFactor.a) != AI_SUCCESS)
                 {
                     if (float shininess; material->Get(AI_MATKEY_SHININESS, shininess))
@@ -482,6 +488,9 @@ assimp::Implementation::BindState assimp::Implementation::processMaterials(const
             }
             else
             {
+                // TODO: Fix build error : 'AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_METALLIC_FACTOR' and 'AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_ROUGHNESS_FACTOR' was not declared.
+                #define AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_METALLIC_FACTOR "$mat.gltf.pbrMetallicRoughness.metallicFactor", 0, 0
+                #define AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_ROUGHNESS_FACTOR "$mat.gltf.pbrMetallicRoughness.roughnessFactor", 0, 0
                 material->Get(AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_METALLIC_FACTOR, pbr.metallicFactor);
                 material->Get(AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_ROUGHNESS_FACTOR, pbr.roughnessFactor);
             }
