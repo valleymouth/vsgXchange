@@ -9,42 +9,42 @@
 namespace NastranImplementation
 {
 
-#define GLSL450(src) "#version 450\n #extension GL_ARB_separate_shader_objects : enable\n\n" #src
-
-const char* vertSource = GLSL450(
+const char* vertSource = R"(
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
 
 layout(push_constant) uniform PushConstants {
     mat4 projection;
     mat4 modelview;
 } pc;
 
-layout(location = 0) in vec4 nastranVertex; ///(X,Y,Z,Temp)
+layout(location = 0) in vec3 vsg_Vertex;
+layout(location = 1) in float vsg_Temperature;
 
-layout(location = 0) out vec3 Temp;
-
+layout(location = 0) out float temp;
 
 out gl_PerVertex{
     vec4 gl_Position;
 };
 
-
 void main() {
-    vec3 Vertex = nastranVertex.xyz;
-    float Color = nastranVertex.w;
-    gl_Position = (pc.projection * pc.modelview) * vec4(Vertex, 1.0f);
-    Temp = vec3(Color);
+    gl_Position = (pc.projection * pc.modelview) * vec4(vsg_Vertex, 1.0f);
+    temp = vsg_Temperature;
 }
-);
+)";
 
-const char* fragSource = GLSL450(
+const char* fragSource = R"(
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+
+layout(location = 0) in float temp;
 
 layout(location = 0) out vec4 outColor;
-layout(location = 0) in vec3 Temp;
 
 void main() {
-    outColor = vec4(Temp, 1.0f);
+    outColor = vec4(temp, temp, temp, 1.0f);
 }
-);
+)";
 
 bool debugOutput = false;
 
@@ -60,11 +60,11 @@ void normalizeTemperatures(std::vector<float>& temperatures)
     }
     
     //Normalizing Temps between 0 and 1
-    for (int i = 0; i < temperatures.size(); i++)
+    for (auto& temp : temperatures)
     {
-        float normalizedTemp = (temperatures[i] - minTemp) / (maxTemp - minTemp);
-        if(debugOutput) std::cout << "normalize temp: " << temperatures[i] << " -> " << normalizedTemp << std::endl;
-        temperatures[i] = normalizedTemp;
+        float normalizedTemp = (temp - minTemp) / (maxTemp - minTemp);
+        if(debugOutput) std::cout << "normalize temp: " << temp << " -> " << normalizedTemp << std::endl;
+        temp = normalizedTemp;
     }
 
 }
@@ -269,43 +269,27 @@ vsg::ref_ptr<vsg::Object> read(std::istream& stream)
         normalizeIDIndex++;
     }
 
-
-    //create a nastran List structured like this -> List<vec4(X, Y, Z, Temp)>
-    //just merge the gridList and temperatureList
-    std::vector<vsg::vec4> nastranList;
-    int nastranListIndex = 0;
-    for (auto gridItem : gridList)
+    auto vsg_vertices = vsg::vec3Array::create(static_cast<uint32_t>(gridList.size()));
+    auto vsg_temperatures = vsg::floatArray::create(static_cast<uint32_t>(gridList.size()));
+    for (size_t i = 0; i < gridList.size(); ++i)
     {
-        vsg::vec4 nastranItem(gridItem.x, gridItem.y, gridItem.z, temperatureList[nastranListIndex]);
-        nastranList.push_back(nastranItem);
-        if (debugOutput) std::cout << "NAS [" << nastranListIndex << "]: " << gridItem.x << " / " << gridItem.y << " / " << gridItem.z << " Normalized Temperature: " << temperatureList[nastranListIndex] << std::endl;
-        nastranListIndex++;
+        (*vsg_vertices)[i] = gridList[i];
+        (*vsg_temperatures)[i] = temperatureList[i];
     }
 
-
     //convert idList to indexBuffer
-    for (int i = 0; i < unfoldedIDList.size(); i++) {
+    for (size_t i = 0; i < unfoldedIDList.size(); ++i) {
         unfoldedIDList[i] = gridToIndexMap[unfoldedIDList[i]];
         if (debugOutput) std::cout << "Map Grid ID [" << i << "] -> to IndexBufferID -> " << unfoldedIDList[i] << std::endl;
     }
 
     if (debugOutput) std::cout << "unfolded indexBuffer size: " << unfoldedIDList.size() << std::endl;
 
-    //Now everythings here
-    //Vertex Buffer -> nastranList = List<vec4(X, Y, Z, Temp)>
-    //Index Buffer -> unfoldedIDList
-    //Convert to valid vsg::Data
-
-    vsg::ref_ptr<vsg::vec4Array> vsg_vertices;
-    vsg::ref_ptr<vsg::intArray> vsg_indices;
-
-    auto convertedVertexArray = vsg::vec4Array::create(static_cast<uint32_t>(nastranList.size()));
-    std::copy(nastranList.begin(), nastranList.end(), convertedVertexArray->data());
-    vsg_vertices = convertedVertexArray;
-
-    auto convertedIndex = vsg::intArray::create(static_cast<uint32_t>(unfoldedIDList.size()));
-    std::copy(unfoldedIDList.begin(), unfoldedIDList.end(), convertedIndex->data());
-    vsg_indices = convertedIndex;
+    vsg::ref_ptr<vsg::intArray> vsg_indices = vsg::intArray::create(unfoldedIDList.size());
+    for(size_t i = 0; i<unfoldedIDList.size(); ++i)
+    {
+        vsg_indices->set(i, unfoldedIDList[i]);
+    }
 
 
     vsg::ref_ptr<vsg::ShaderStage> vertexShader = vsg::ShaderStage::create(VK_SHADER_STAGE_VERTEX_BIT, "main", vertSource);
@@ -321,11 +305,13 @@ vsg::ref_ptr<vsg::Object> read(std::istream& stream)
     };
 
     vsg::VertexInputState::Bindings vertexBindingsDescriptions{
-        VkVertexInputBindingDescription{0, sizeof(vsg::vec4), VK_VERTEX_INPUT_RATE_VERTEX}, // nastran vertex
+        VkVertexInputBindingDescription{0, sizeof(vsg::vec3), VK_VERTEX_INPUT_RATE_VERTEX}, // nastran vertex
+        VkVertexInputBindingDescription{1, sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX}, // nastran vertex
     };
 
     vsg::VertexInputState::Attributes vertexAttributeDescriptions{
-        VkVertexInputAttributeDescription{0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0}, // vertex data
+        VkVertexInputAttributeDescription{0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0}, // vertex data
+        VkVertexInputAttributeDescription{1, 1, VK_FORMAT_R32_SFLOAT, 0}, // temprature data
     };
 
     vsg::GraphicsPipelineStates pipelineStates{
@@ -345,22 +331,17 @@ vsg::ref_ptr<vsg::Object> read(std::istream& stream)
     auto stategroup = vsg::StateGroup::create();
     stategroup->add(bindGraphicsPipeline);
 
-    // set up model transformation node
-    auto transform = vsg::MatrixTransform::create(); // VK_SHADER_STAGE_VERTEX_BIT
-
-    // add transform to root of the scene graph
-    stategroup->addChild(transform);
-
     // setup geometry
-    auto drawCommands = vsg::Commands::create();
-    drawCommands->addChild(vsg::BindVertexBuffers::create(0, vsg::DataList{ vsg_vertices }));
-    drawCommands->addChild(vsg::BindIndexBuffer::create(vsg_indices));
-    drawCommands->addChild(vsg::DrawIndexed::create(vsg_indices->size(), 1, 0, 0, 0));
+    auto vid = vsg::VertexIndexDraw::create();
+    vid->assignArrays({ vsg_vertices, vsg_temperatures });
+    vid->assignIndices(vsg_indices);
+    vid->indexCount = vsg_indices->size();
+    vid->instanceCount = 1;
 
     // add drawCommands to transform
-    transform->addChild(drawCommands);
+    stategroup->addChild(vid);
 
-    std::cout << "Nastran file loaded" << std::endl;
+    if (debugOutput) std::cout << "Nastran file loaded" << std::endl;
 
     return stategroup;
 }
