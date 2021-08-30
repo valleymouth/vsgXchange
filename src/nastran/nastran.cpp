@@ -5,7 +5,9 @@
 #include <fstream>
 #include <map>
 
-using namespace vsgXchange;
+
+namespace NastranImplementation
+{
 
 #define GLSL450(src) "#version 450\n #extension GL_ARB_separate_shader_objects : enable\n\n" #src
 
@@ -69,7 +71,6 @@ void normalizeTemperatures(std::vector<float>& temperatures)
 
 void parseGridsToIDAndVec3Vec(const std::string& line, std::vector<vsg::vec3>& gridList, std::vector<int>& idList) 
 {
-
     std::regex regex(",");
 
     std::vector<std::string> out(
@@ -199,33 +200,15 @@ void parseTempToIDandFloatVec(const std::string& line, std::vector<float>& tempe
     if (debugOutput) std::cout << "Temp: [" << id << "] " << temperature << std::endl;
 }
 
-nastran::nastran() 
-{
-    debugOutput = enableDebugOutput;
-}
-
-vsg::ref_ptr<vsg::Object> nastran::read(const vsg::Path& filename, vsg::ref_ptr<const vsg::Options> options) const
-{
-    auto ext = vsg::lowerCaseFileExtension(filename);
-    if (ext != "nas" || !vsg::fileExists(filename)) return { };
-    
-
-    std::ifstream stream(filename.c_str(), std::ios::in);
-    if (!stream) return { };
-    return read(stream, options);
-
-    return vsg::ref_ptr<vsg::Object>();
-}
-
 void printVec3(int index, const vsg::vec3 input)
 {
     if (debugOutput) std::cout << "[" << index << "] " << input.x << " / " << input.y << " / " << input.z << std::endl;
 }
 
-vsg::ref_ptr<vsg::Object> nastran::read(std::istream& stream, vsg::ref_ptr<const vsg::Options> options) const
+vsg::ref_ptr<vsg::Object> read(std::istream& stream)
 {
     std::string line;
-  
+
     //values GRID,VertexIndex,,X,Y,Z,,,, -> vec3(X,Y,Z)
     std::vector<vsg::vec3> gridList;
     //keys GRID,VertexIndex,,X,Y,Z,,,, -> VertexIndex
@@ -240,7 +223,7 @@ vsg::ref_ptr<vsg::Object> nastran::read(std::istream& stream, vsg::ref_ptr<const
     //"Unfolded" because Quads get parsed into 2 triangles
     //Still contains the IDs, has to be converted to an IndexBuffer
     std::vector<int> unfoldedIDList;
-    
+
     while (getline(stream, line))
     {
         if (line.find("GRID,") != std::string::npos)
@@ -261,7 +244,7 @@ vsg::ref_ptr<vsg::Object> nastran::read(std::istream& stream, vsg::ref_ptr<const
         }
     }
 
-    
+
     //Do TempIndices and VertexIndices match?
     std::sort(gridIDs.begin(), gridIDs.end());
     std::sort(temperatureIDs.begin(), temperatureIDs.end());
@@ -312,7 +295,7 @@ vsg::ref_ptr<vsg::Object> nastran::read(std::istream& stream, vsg::ref_ptr<const
     //Vertex Buffer -> nastranList = List<vec4(X, Y, Z, Temp)>
     //Index Buffer -> unfoldedIDList
     //Convert to valid vsg::Data
-    
+
     vsg::ref_ptr<vsg::vec4Array> vsg_vertices;
     vsg::ref_ptr<vsg::intArray> vsg_indices;
 
@@ -382,8 +365,35 @@ vsg::ref_ptr<vsg::Object> nastran::read(std::istream& stream, vsg::ref_ptr<const
     return stategroup;
 }
 
+} // NastranImplementation namespace
 
-bool nastran::getFeatures(Features& features) const
+vsgXchange::nastran::nastran()
+{
+}
+
+vsg::ref_ptr<vsg::Object> vsgXchange::nastran::read(const vsg::Path& filename, vsg::ref_ptr<const vsg::Options> options) const
+{
+    auto ext = vsg::lowerCaseFileExtension(filename);
+    if (ext != "nas") return {};
+
+    vsg::Path filenameToUse = vsg::findFile(filename, options);
+    if (filenameToUse.empty()) return {};
+
+    std::ifstream stream(filenameToUse.c_str(), std::ios::in);
+    if (!stream) return { };
+
+    return NastranImplementation::read(stream);
+}
+
+vsg::ref_ptr<vsg::Object> vsgXchange::nastran::read(std::istream& stream, vsg::ref_ptr<const vsg::Options> options) const
+{
+    if (options->extensionHint != "nas") return {};
+
+    return NastranImplementation::read(stream);
+}
+
+
+bool vsgXchange::nastran::getFeatures(Features& features) const
 {
     features.extensionFeatureMap["nas"] = static_cast<vsg::ReaderWriter::FeatureMask>(vsg::ReaderWriter::READ_FILENAME | vsg::ReaderWriter::READ_ISTREAM);
     return true;
