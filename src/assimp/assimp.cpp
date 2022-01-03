@@ -734,6 +734,52 @@ vsg::ref_ptr<vsg::Object> assimp::Implementation::read(const vsg::Path& filename
             auto opt = vsg::Options::create(*options);
             opt->paths.insert(opt->paths.begin(), vsg::filePath(filenameToUse));
 
+            if (scene->mNumLights > 0 || scene->mNumCameras > 0)
+            {
+                std::cout<<"filename = "<<filename<<", mNumLights = "<<scene->mNumLights<<", mNumCameras = "<<scene->mNumCameras<<std::endl;
+                for(unsigned int li = 0; li<scene->mNumLights; ++li)
+                {
+                    auto* light = scene->mLights[li];
+                    std::cout<<"   light "<<light<<std::endl;
+                    std::cout<<"      light->mName = "<<light->mName.C_Str()<<std::endl;
+                    std::cout<<"      light->mType = "<<light->mType<<" ";
+                    switch(light->mType)
+                    {
+                        case(aiLightSource_DIRECTIONAL): std::cout<<"aiLightSource_DIRECTIONAL"<<std::endl; break;
+                        case(aiLightSource_POINT): std::cout<<"aiLightSource_POINT"<<std::endl; break;
+                        case(aiLightSource_SPOT): std::cout<<"aiLightSource_SPOT"<<std::endl; break;
+                        case(aiLightSource_AMBIENT): std::cout<<"aiLightSource_AMBIENT"<<std::endl; break;
+                        case(aiLightSource_AREA): std::cout<<"aiLightSource_AREA"<<std::endl; break;
+                        case(aiLightSource_UNDEFINED): std::cout<<"aiLightSource_UNDEFINED"<<std::endl; break;
+                        default: std::cout<<"aiLightSource out of range"<<std::endl; break;
+                    };
+                    std::cout<<"      light->mPosition = "<<light->mPosition[0]<<", "<<light->mPosition[1]<<", "<<light->mPosition[2]<<std::endl;
+                    std::cout<<"      light->mDirection = "<<light->mDirection[0]<<", "<<light->mDirection[1]<<", "<<light->mDirection[2]<<std::endl;
+                    std::cout<<"      light->mUp = "<<light->mUp[0]<<", "<<light->mUp[1]<<", "<<light->mUp[2]<<std::endl;
+                    std::cout<<"      light->mAttenuationConstant = "<<light->mAttenuationConstant<<", mAttenuationLinear = "<<light->mAttenuationLinear<<", mAttenuationQuadratic = "<<light->mAttenuationQuadratic<<std::endl;
+                    std::cout<<"      light->mColorDiffuse = "<<light->mColorDiffuse[0]<<", "<<light->mColorDiffuse[1]<<", "<<light->mColorDiffuse[2]<<std::endl;
+                    std::cout<<"      light->mColorSpecular = "<<light->mColorSpecular[0]<<", "<<light->mColorSpecular[1]<<", "<<light->mColorSpecular[2]<<std::endl;
+                    std::cout<<"      light->mColorAmbient = "<<light->mColorAmbient[0]<<", "<<light->mColorAmbient[1]<<", "<<light->mColorAmbient[2]<<std::endl;
+                    std::cout<<"      light->mAngleInnerCone = "<<light->mAngleInnerCone<<", mAngleOuterCone = "<<light->mAngleOuterCone<<std::endl;
+                    std::cout<<"      light->mSize = "<<light->mSize[0]<<", "<<light->mSize[1]<<std::endl;
+                }
+
+
+                for(unsigned int li = 0; li<scene->mNumCameras; ++li)
+                {
+                    auto* camera = scene->mCameras[li];
+                    std::cout<<"   camera "<<camera<<std::endl;
+                    std::cout<<"      camera->mName = "<<camera->mName.C_Str()<<std::endl;
+                    std::cout<<"      camera->mPosition = "<<camera->mPosition[0]<<", "<<camera->mPosition[1]<<", "<<camera->mPosition[2]<<std::endl;
+                    std::cout<<"      camera>mLookAt = "<<camera->mLookAt[0]<<", "<<camera->mLookAt[1]<<", "<<camera->mLookAt[2]<<std::endl;
+                    std::cout<<"      camera->mUp = "<<camera->mUp[0]<<", "<<camera->mUp[1]<<", "<<camera->mUp[2]<<std::endl;
+                    std::cout<<"      camera->mHorizontalFOV = "<<camera->mHorizontalFOV<<std::endl;
+                    std::cout<<"      camera->mClipPlaneNear = "<<camera->mClipPlaneNear<<", mClipPlaneFar = "<<camera->mClipPlaneFar<<std::endl;
+                    std::cout<<"      camera->mAspect = "<<camera->mAspect<<std::endl;
+                    //std::cout<<"      camera->mOrthographicWidth = "<<camera->mOrthographicWidth<<std::endl;
+                }
+            }
+
             return processScene(scene, opt, ext);
         }
         else
