@@ -95,11 +95,15 @@ public:
     vsg::vec3 convert(const aiColor3D& v) const { return vsg::vec3(v[0], v[1], v[2]); }
 
 private:
-    using StateCommandPtr = vsg::ref_ptr<vsg::StateCommand>;
-    using State = std::pair<StateCommandPtr, StateCommandPtr>;
+
+    struct State {
+      vsg::ref_ptr<vsg::BindGraphicsPipeline> first;
+      vsg::ref_ptr<vsg::BindDescriptorSet> second;
+    };
+
     using BindState = std::vector<State>;
 
-    vsg::ref_ptr<vsg::GraphicsPipeline> createPipeline(vsg::ref_ptr<vsg::ShaderStage> vs, vsg::ref_ptr<vsg::ShaderStage> fs, vsg::ref_ptr<vsg::DescriptorSetLayout> descriptorSetLayout, bool doubleSided = false, bool enableBlend = false) const;
+    vsg::ref_ptr<vsg::GraphicsPipeline> createPipeline(vsg::ref_ptr<vsg::ShaderStage> vs, vsg::ref_ptr<vsg::ShaderStage> fs, const vsg::DescriptorSetLayouts& descriptorSetLayouts, bool doubleSided = false, bool enableBlend = false) const;
     void createDefaultPipelineAndState();
     vsg::ref_ptr<vsg::Object> processScene(const aiScene* scene, vsg::ref_ptr<const vsg::Options> options, const vsg::Path& ext) const;
     BindState processMaterials(const aiScene* scene, vsg::ref_ptr<const vsg::Options> options) const;
@@ -279,7 +283,7 @@ assimp::Implementation::Implementation() :
     createDefaultPipelineAndState();
 }
 
-vsg::ref_ptr<vsg::GraphicsPipeline> assimp::Implementation::createPipeline(vsg::ref_ptr<vsg::ShaderStage> vs, vsg::ref_ptr<vsg::ShaderStage> fs, vsg::ref_ptr<vsg::DescriptorSetLayout> descriptorSetLayout, bool doubleSided, bool enableBlend) const
+vsg::ref_ptr<vsg::GraphicsPipeline> assimp::Implementation::createPipeline(vsg::ref_ptr<vsg::ShaderStage> vs, vsg::ref_ptr<vsg::ShaderStage> fs, const vsg::DescriptorSetLayouts& descriptorSetLayouts, bool doubleSided, bool enableBlend) const
 {
     vsg::PushConstantRanges pushConstantRanges{
         {VK_SHADER_STAGE_VERTEX_BIT, 0, 128} // projection view, and model matrices, actual push constant calls autoaatically provided by the VSG's DispatchTraversal
@@ -314,7 +318,7 @@ vsg::ref_ptr<vsg::GraphicsPipeline> assimp::Implementation::createPipeline(vsg::
         colorBlendState,
         vsg::DepthStencilState::create()};
 
-    auto pipelineLayout = vsg::PipelineLayout::create(vsg::DescriptorSetLayouts{descriptorSetLayout}, pushConstantRanges);
+    auto pipelineLayout = vsg::PipelineLayout::create(descriptorSetLayouts, pushConstantRanges);
     return vsg::GraphicsPipeline::create(pipelineLayout, vsg::ShaderStages{vs, fs}, pipelineStates);
 }
 
@@ -326,13 +330,19 @@ void assimp::Implementation::createDefaultPipelineAndState()
     vsg::DescriptorSetLayoutBindings descriptorBindings{
         {10, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
 
-    _defaultPipeline = createPipeline(vertexShader, fragmentShader, vsg::DescriptorSetLayout::create(descriptorBindings));
+    auto descriptorSetLayout = vsg::DescriptorSetLayout::create(descriptorBindings);
+
+    vsg::DescriptorSetLayouts descriptorSetLayouts{descriptorSetLayout};
+
+    _defaultPipeline = createPipeline(vertexShader, fragmentShader, descriptorSetLayouts);
 
     // create texture image and associated DescriptorSets and binding
     auto mat = vsg::PhongMaterialValue::create();
     auto material = vsg::DescriptorBuffer::create(mat, 10);
 
     auto descriptorSet = vsg::DescriptorSet::create(_defaultPipeline->layout->setLayouts.front(), vsg::Descriptors{material});
+
+
     _defaultState = vsg::BindDescriptorSet::create(VK_PIPELINE_BIND_POINT_GRAPHICS, _defaultPipeline->layout, 0, descriptorSet);
 }
 
@@ -346,8 +356,13 @@ vsg::ref_ptr<vsg::Object> assimp::Implementation::processScene(const aiScene* sc
 
 
     auto scenegraph = vsg::StateGroup::create();
-    scenegraph->add(vsg::BindGraphicsPipeline::create(_defaultPipeline));
-    scenegraph->add(_defaultState);
+    //scenegraph->add(vsg::BindGraphicsPipeline::create(_defaultPipeline));
+    ///scenegraph->add(_defaultState);
+
+    if (options/* && options->viewDescriptorSetLayout*/)
+    {
+        std::cout<<"assimp::Implementation::processScene() viewDescriptorSetLayout = "<<options->viewDescriptorSetLayout<<std::endl;
+    }
 
     std::map<std::string, vsg::ref_ptr<vsg::Camera>> cameraMap;
 
@@ -410,7 +425,7 @@ vsg::ref_ptr<vsg::Object> assimp::Implementation::processScene(const aiScene* sc
                     auto vsg_light = vsg::PointLight::create();
                     vsg_light->name = light->mName.C_Str();
                     vsg_light->color = convert(light->mColorDiffuse);
-                    vsg_light->position = dconvert(light->mDirection);
+                    vsg_light->position = dconvert(light->mPosition);
                     lightMap[vsg_light->name] = vsg_light;
                     break;
                 }
@@ -420,7 +435,7 @@ vsg::ref_ptr<vsg::Object> assimp::Implementation::processScene(const aiScene* sc
                     auto vsg_light = vsg::SpotLight::create();
                     vsg_light->name = light->mName.C_Str();
                     vsg_light->color = convert(light->mColorDiffuse);
-                    vsg_light->position = dconvert(light->mDirection);
+                    vsg_light->position = dconvert(light->mPosition);
                     vsg_light->direction = dconvert(light->mDirection);
                     vsg_light->innerAngle = light->mAngleInnerCone;
                     vsg_light->outerAngle = light->mAngleOuterCone;
@@ -432,7 +447,7 @@ vsg::ref_ptr<vsg::Object> assimp::Implementation::processScene(const aiScene* sc
                     std::cout<<"    light->mType = aiLightSource_AMBIENT"<<std::endl;
                     auto vsg_light = vsg::AmbientLight::create();
                     vsg_light->name = light->mName.C_Str();
-                    vsg_light->color = convert(light->mColorDiffuse);
+                    vsg_light->color = convert(light->mColorAmbient);
                     lightMap[vsg_light->name] = vsg_light;
                     break;
                 }
@@ -552,6 +567,14 @@ vsg::ref_ptr<vsg::Object> assimp::Implementation::processScene(const aiScene* sc
 
                     stategroup->add(state.first);
                     stategroup->add(state.second);
+
+                    if (options->viewDescriptorSetLayout)
+                    {
+                        stategroup->add(vsg::BindViewDescriptorSets::create(VK_PIPELINE_BIND_POINT_GRAPHICS, state.first->pipeline->layout, 1));
+                    }
+
+                    std::cout<<"StateGroup "<<stategroup<<" "<<state.first<<", "<<state.second<<std::endl;
+
                 }
 
                 if (useVertexIndexDraw)
@@ -711,15 +734,39 @@ assimp::Implementation::BindState assimp::Implementation::processMaterials(const
             auto descriptorSetLayout = vsg::DescriptorSetLayout::create(descriptorBindings);
             auto descriptorSet = vsg::DescriptorSet::create(descriptorSetLayout, descList);
 
-            auto vertexShader = assimp_vert();
-            auto fragmentShader = assimp_pbr_frag();
+            vsg::DescriptorSetLayouts descriptorSetLayouts{descriptorSetLayout};
+            if (options->viewDescriptorSetLayout)
+            {
+                defines.push_back("VSG_VIEW_LIGHT_DATA");
+                descriptorSetLayouts.push_back(options->viewDescriptorSetLayout);
+
+            }
+
+            auto options_no_cache = vsg::Options::create(*options);
+            options_no_cache->objectCache = {};
+
+            auto vertexShader = vsg::read_cast<vsg::ShaderStage>("shaders/assimp.vert", options_no_cache);
+            if (!vertexShader) vertexShader = assimp_vert(); // fallback to shaders/assimp_vert.cppp
+
+            auto fragmentShader = vsg::read_cast<vsg::ShaderStage>("shaders/assimp_pbr.frag", options_no_cache);
+            if (!fragmentShader) fragmentShader = assimp_pbr_frag(); // fallback to shaders/assimp_pbr_vert.cppp
+
             vertexShader->module->hints = shaderHints;
             fragmentShader->module->hints = shaderHints;
 
-            auto pipeline = createPipeline(vertexShader, fragmentShader, descriptorSetLayout, isTwoSided);
+            auto pipeline = createPipeline(vertexShader, fragmentShader, descriptorSetLayouts, isTwoSided);
+
+
+            auto bindGraphicsPipeline = vsg::BindGraphicsPipeline::create(pipeline);
             auto bindDescriptorSet = vsg::BindDescriptorSet::create(VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->layout, 0, descriptorSet);
 
-            bindDescriptorSets.push_back({vsg::BindGraphicsPipeline::create(pipeline), bindDescriptorSet});
+            std::cout<<"PBR Enabled lighting "<<bindGraphicsPipeline<<std::endl;
+            for(auto& def : defines)
+            {
+                std::cout<<"\t"<<def<<std::endl;
+            }
+
+            bindDescriptorSets.push_back({bindGraphicsPipeline, bindDescriptorSet});
         }
         else
         {
@@ -824,13 +871,25 @@ assimp::Implementation::BindState assimp::Implementation::processMaterials(const
             descList.push_back(buffer);
 
             auto descriptorSetLayout = vsg::DescriptorSetLayout::create(descriptorBindings);
+            vsg::DescriptorSetLayouts descriptorSetLayouts{descriptorSetLayout};
+            if (options->viewDescriptorSetLayout)
+            {
+                defines.push_back("VSG_VIEW_LIGHT_DATA");
+                descriptorSetLayouts.push_back(options->viewDescriptorSetLayout);
 
-            auto vertexShader = assimp_vert();
-            auto fragmentShader = assimp_pbr_frag();
+                std::cout<<"Phong Enabled lighting "<<std::endl;
+            }
+
+            auto vertexShader = vsg::read_cast<vsg::ShaderStage>("shaders/assimp.vert", options);
+            if (!vertexShader) vertexShader = assimp_vert(); // fallback to shaders/assimp_vert.cppp
+
+            auto fragmentShader = vsg::read_cast<vsg::ShaderStage>("shaders/assimp_phong.frag", options);
+            if (!fragmentShader) fragmentShader = assimp_phong_frag(); // fallback to shaders/assimp_phong_vert.cppp
+
             vertexShader->module->hints = shaderHints;
             fragmentShader->module->hints = shaderHints;
 
-            auto pipeline = createPipeline(vertexShader, fragmentShader, descriptorSetLayout, isTwoSided);
+            auto pipeline = createPipeline(vertexShader, fragmentShader, descriptorSetLayouts, isTwoSided);
 
             auto descriptorSet = vsg::DescriptorSet::create(descriptorSetLayout, descList);
             auto bindDescriptorSet = vsg::BindDescriptorSet::create(VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->layout, 0, descriptorSet);
