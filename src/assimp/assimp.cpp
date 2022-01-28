@@ -359,11 +359,6 @@ vsg::ref_ptr<vsg::Object> assimp::Implementation::processScene(const aiScene* sc
     //scenegraph->add(vsg::BindGraphicsPipeline::create(_defaultPipeline));
     ///scenegraph->add(_defaultState);
 
-    if (options/* && options->viewDescriptorSetLayout*/)
-    {
-        std::cout<<"assimp::Implementation::processScene() viewDescriptorSetLayout = "<<options->viewDescriptorSetLayout<<std::endl;
-    }
-
     std::map<std::string, vsg::ref_ptr<vsg::Camera>> cameraMap;
 
     if (scene->mNumCameras > 0)
@@ -567,14 +562,7 @@ vsg::ref_ptr<vsg::Object> assimp::Implementation::processScene(const aiScene* sc
 
                     stategroup->add(state.first);
                     stategroup->add(state.second);
-
-                    if (options->viewDescriptorSetLayout)
-                    {
-                        stategroup->add(vsg::BindViewDescriptorSets::create(VK_PIPELINE_BIND_POINT_GRAPHICS, state.first->pipeline->layout, 1));
-                    }
-
-                    std::cout<<"StateGroup "<<stategroup<<" "<<state.first<<", "<<state.second<<std::endl;
-
+                    stategroup->add(vsg::BindViewDescriptorSets::create(VK_PIPELINE_BIND_POINT_GRAPHICS, state.first->pipeline->layout, 1));
                 }
 
                 if (useVertexIndexDraw)
@@ -734,14 +722,11 @@ assimp::Implementation::BindState assimp::Implementation::processMaterials(const
             auto descriptorSetLayout = vsg::DescriptorSetLayout::create(descriptorBindings);
             auto descriptorSet = vsg::DescriptorSet::create(descriptorSetLayout, descList);
 
-            vsg::DescriptorSetLayouts descriptorSetLayouts{descriptorSetLayout};
-            if (options->viewDescriptorSetLayout)
-            {
-                defines.push_back("VSG_VIEW_LIGHT_DATA");
-                descriptorSetLayouts.push_back(options->viewDescriptorSetLayout);
+            vsg::DescriptorSetLayouts descriptorSetLayouts{descriptorSetLayout, vsg::ViewDescriptorSetLayout::create()};
+            defines.push_back("VSG_VIEW_LIGHT_DATA");
 
-            }
-
+            /// Work around for ObjectCache reused ShaderModules which isn't appropriate when the ShaderHints can vary.
+            /// TODO : come up with a better scheme for managing shaders/shader hints.
             auto options_no_cache = vsg::Options::create(*options);
             options_no_cache->objectCache = {};
 
@@ -756,15 +741,8 @@ assimp::Implementation::BindState assimp::Implementation::processMaterials(const
 
             auto pipeline = createPipeline(vertexShader, fragmentShader, descriptorSetLayouts, isTwoSided);
 
-
             auto bindGraphicsPipeline = vsg::BindGraphicsPipeline::create(pipeline);
             auto bindDescriptorSet = vsg::BindDescriptorSet::create(VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->layout, 0, descriptorSet);
-
-            std::cout<<"PBR Enabled lighting "<<bindGraphicsPipeline<<std::endl;
-            for(auto& def : defines)
-            {
-                std::cout<<"\t"<<def<<std::endl;
-            }
 
             bindDescriptorSets.push_back({bindGraphicsPipeline, bindDescriptorSet});
         }
@@ -871,19 +849,19 @@ assimp::Implementation::BindState assimp::Implementation::processMaterials(const
             descList.push_back(buffer);
 
             auto descriptorSetLayout = vsg::DescriptorSetLayout::create(descriptorBindings);
-            vsg::DescriptorSetLayouts descriptorSetLayouts{descriptorSetLayout};
-            if (options->viewDescriptorSetLayout)
-            {
-                defines.push_back("VSG_VIEW_LIGHT_DATA");
-                descriptorSetLayouts.push_back(options->viewDescriptorSetLayout);
+            vsg::DescriptorSetLayouts descriptorSetLayouts{descriptorSetLayout, vsg::ViewDescriptorSetLayout::create()};
+            defines.push_back("VSG_VIEW_LIGHT_DATA");
 
-                std::cout<<"Phong Enabled lighting "<<std::endl;
-            }
 
-            auto vertexShader = vsg::read_cast<vsg::ShaderStage>("shaders/assimp.vert", options);
+            /// Work around for ObjectCache reused ShaderModules which isn't appropriate when the ShaderHints can vary.
+            /// TODO : come up with a better scheme for managing shaders/shader hints.
+            auto options_no_cache = vsg::Options::create(*options);
+            options_no_cache->objectCache = {};
+
+            auto vertexShader = vsg::read_cast<vsg::ShaderStage>("shaders/assimp.vert", options_no_cache);
             if (!vertexShader) vertexShader = assimp_vert(); // fallback to shaders/assimp_vert.cppp
 
-            auto fragmentShader = vsg::read_cast<vsg::ShaderStage>("shaders/assimp_phong.frag", options);
+            auto fragmentShader = vsg::read_cast<vsg::ShaderStage>("shaders/assimp_phong.frag", options_no_cache);
             if (!fragmentShader) fragmentShader = assimp_phong_frag(); // fallback to shaders/assimp_phong_vert.cppp
 
             vertexShader->module->hints = shaderHints;
